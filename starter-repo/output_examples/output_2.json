@@ -1,0 +1,13 @@
+{
+  "status": "success",
+  "summary": "A quick operational summary was generated.",
+  "steps": [
+    "Review input",
+    "Call the agent registry",
+    "Return a final response"
+  ],
+  "metadata": {
+    "request_id": "demo-456",
+    "source": "output_examples"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "status": "success",
+  "summary": "Processing finished with a default fastapi scaffold response.",
+  "steps": [
+    "Load the application",
+    "Validate the health endpoint",
+    "Emit a trace message"
+  ],
+  "metadata": {
+    "request_id": "demo-789",
+    "source": "output_examples"
+  }
+}

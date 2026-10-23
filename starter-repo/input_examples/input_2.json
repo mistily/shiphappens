@@ -1,0 +1,8 @@
+{
+  "prompt": "Generate a plan for designing a simple AI workflow service.",
+  "context": {
+    "domain": "genai",
+    "priority": "high"
+  },
+  "agents": ["planner", "executor"]
+}

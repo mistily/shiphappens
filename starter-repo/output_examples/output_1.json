@@ -1,0 +1,13 @@
+{
+  "status": "success",
+  "summary": "Demo workflow completed.",
+  "steps": [
+    "Plan the request",
+    "Analyze available context",
+    "Return a concise result"
+  ],
+  "metadata": {
+    "request_id": "demo-123",
+    "source": "output_examples"
+  }
+}

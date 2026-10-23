@@ -1,0 +1,8 @@
+{
+  "prompt": "Summarize the data sources available for this request.",
+  "context": {
+    "source": "input_examples",
+    "dataset": "demo"
+  },
+  "agents": ["planner", "researcher", "executor"]
+}

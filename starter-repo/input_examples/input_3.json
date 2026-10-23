@@ -1,0 +1,8 @@
+{
+  "prompt": "Review any available context and return a concise operational summary.",
+  "context": {
+    "source": "compass",
+    "environment": "staging"
+  },
+  "agents": ["researcher", "executor"]
+}

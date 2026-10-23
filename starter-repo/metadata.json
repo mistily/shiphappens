@@ -1,0 +1,8 @@
+{
+  "name": "shiphappens-starter",
+  "version": "0.1.0",
+  "description": "FastAPI starter for the Ship Happens GenAI hackathon project.",
+  "python_version": "3.12",
+  "framework": "fastapi",
+  "entrypoint": "run:app"
+}
