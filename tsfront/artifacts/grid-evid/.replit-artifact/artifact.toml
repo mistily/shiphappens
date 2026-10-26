@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "GRID-EVID"
+description = "An explainable carbon-aware workload orchestration console for data center operators. Ingests workload and grid evidence, coordinates specialist agents, applies deterministic SLA and hardware safety gates, routes uncertain decisions to human review, and records shadow-mode outcomes."
+version = "1.0.0"
+id = "artifacts/grid-evid"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21850
+
+[services.development]
+run = "pnpm --filter @workspace/grid-evid run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/grid-evid", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/grid-evid/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21850"
+BASE_PATH = "/"
