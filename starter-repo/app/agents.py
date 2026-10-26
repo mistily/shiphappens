@@ -16,18 +16,27 @@ class AgentRegistry:
         self._agents: Dict[str, AgentDefinition] = {
             "planner": AgentDefinition(
                 name="planner",
-                description="Breaks the user request into a concrete execution plan.",
-                prompts=["Identify goals, constraints, and required steps."],
+                description="Breaks the user request into a concrete execution plan based on evidence and constraints.",
+                prompts=[
+                    "Normalize fragmented evidence into a single dataset.",
+                    "Extract objective, constraints, assumptions, and risks.",
+                    "Return a strict structured plan with execution steps and final recommendation.",
+                ],
             ),
             "researcher": AgentDefinition(
                 name="researcher",
-                description="Gathers context and relevant facts from the available data sources.",
-                prompts=["Gather the most relevant facts and cite assumptions."],
+                description="Collects and normalizes external evidence and source metadata.",
+                prompts=["Collect evidence, preserve source URLs and timestamps, and identify conflicts."],
             ),
-            "executor": AgentDefinition(
-                name="executor",
-                description="Executes the selected actions and formulates a final result.",
-                prompts=["Produce a concise, actionable response."],
+            "optimizer": AgentDefinition(
+                name="optimizer",
+                description="Runs deterministic feasibility, energy, and CO2 calculations to rank candidate options.",
+                prompts=["Apply deterministic scoring and explain trade-offs using numeric evidence."],
+            ),
+            "evaluator": AgentDefinition(
+                name="evaluator",
+                description="Validates the plan against constraints, feasibility thresholds, and confidence requirements.",
+                prompts=["Reject low-quality plans, note gaps, and require revisions when evidence is weak."],
             ),
         }
 

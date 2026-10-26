@@ -1,142 +1,159 @@
 from __future__ import annotations
 
-import json
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-from langchain_core.prompts import PromptTemplate
+from langgraph.graph import END, START, StateGraph
 
-from app.mock_sources import get_provider_inventory, get_provider_snapshot
-from app.schemas import ProviderScore, ProviderSignal, RunRequest, RunResponse
-
-
-def _normalize(value: float, low: float, high: float) -> float:
-    if high == low:
-        return 0.5
-    return max(0.0, min(1.0, (value - low) / (high - low)))
+from app.schemas import EvidenceRecord, PlannerInput, PlannerOutput
+from app.state import GraphState
+from app.optimization import deterministic_feasibility
+from tools.brightdata import BrightDataAdapter
+from tools.zetaris import ZetarisQueryAdapter
 
 
-def score_provider(provider_name: str, request: RunRequest) -> ProviderScore:
-    snapshot = get_provider_snapshot(provider_name)
+def load_evidence(state: GraphState) -> GraphState:
+    task = state["task"]
+    context = state.get("context", {})
 
-    latency_score = _normalize(1000 / max(snapshot["latency_ms"], 1), 0.0, 6.0)
-    reliability_score = float(snapshot["reliability"])
-    coverage_score = float(snapshot["coverage"])
-    cost_score = float(snapshot["cost_efficiency"])
-    sustainability_score = float(snapshot["sustainability"])
-    quality_score = float(snapshot["data_quality"])
+    zetaris = ZetarisQueryAdapter(fixture_mode=True)
+    brightdata = BrightDataAdapter(fixture_mode=True)
 
-    if request.priority == "cost_sensitive":
-        weight_map = {
-            "latency": 0.10,
-            "reliability": 0.20,
-            "coverage": 0.15,
-            "cost": 0.35,
-            "sustainability": 0.10,
-            "quality": 0.10,
-        }
-    elif request.priority == "low_latency":
-        weight_map = {
-            "latency": 0.25,
-            "reliability": 0.20,
-            "coverage": 0.15,
-            "cost": 0.15,
-            "sustainability": 0.10,
-            "quality": 0.15,
-        }
-    else:
-        weight_map = {
-            "latency": 0.15,
-            "reliability": 0.20,
-            "coverage": 0.15,
-            "cost": 0.20,
-            "sustainability": 0.15,
-            "quality": 0.15,
-        }
+    rows = zetaris.query(task=task, filters=context)
+    external = brightdata.retrieve(query=task, context=context)
 
-    overall = (
-        latency_score * weight_map["latency"]
-        + reliability_score * weight_map["reliability"]
-        + coverage_score * weight_map["coverage"]
-        + cost_score * weight_map["cost"]
-        + sustainability_score * weight_map["sustainability"]
-        + quality_score * weight_map["quality"]
-    )
-
-    overall = round(overall, 4)
-    if overall >= 0.82:
-        recommendation = "strong choice"
-    elif overall >= 0.7:
-        recommendation = "viable option"
-    else:
-        recommendation = "watchlist"
-
-    prompt = PromptTemplate(
-        input_variables=["provider", "region", "priority", "overall"],
-        template=(
-            "For {region} operations with {priority} priority, {provider} scored {overall:.3f}. "
-            "This deterministic recommendation is based on latency, reliability, coverage, cost, sustainability, and quality."
+    evidence = [
+        EvidenceRecord(
+            source="zetaris",
+            source_type="fixture",
+            url="https://mock.example.com/zetaris/query",
+            timestamp="2026-10-26T00:00:00Z",
+            payload={"quality_score": 0.9, "rows": rows},
         ),
-    )
-    rationale = prompt.format(
-        provider=provider_name.title(),
-        region=request.region,
-        priority=request.priority,
-        overall=overall,
-    )
+        EvidenceRecord(
+            source="brightdata",
+            source_type="fixture",
+            url=external[0]["url"] if external else "https://mock.example.com/brightdata",
+            timestamp=external[0]["timestamp"] if external else "2026-10-26T00:00:00Z",
+            payload={"quality_score": 0.8, "rows": external},
+        ),
+    ]
 
-    return ProviderScore(
-        provider=provider_name,
-        category=snapshot["category"],
-        total_score=overall,
-        weighted_breakdown={
-            "latency": round(latency_score, 4),
-            "reliability": round(reliability_score, 4),
-            "coverage": round(coverage_score, 4),
-            "cost_efficiency": round(cost_score, 4),
-            "sustainability": round(sustainability_score, 4),
-            "data_quality": round(quality_score, 4),
-        },
-        recommendation=recommendation,
-        rationale=rationale,
-    )
+    return {**state, "evidence": [item.model_dump() for item in evidence], "status": "evidence_loaded"}
 
 
-def build_visual_payload(scores: List[ProviderScore]) -> Dict[str, Any]:
+def normalize_evidence(state: GraphState) -> GraphState:
+    evidence = state.get("evidence", [])
+    normalized = []
+    for item in evidence:
+        normalized.append({
+            "source": item["source"],
+            "source_type": item["source_type"],
+            "url": item.get("url"),
+            "timestamp": item.get("timestamp"),
+            "payload": item.get("payload", {}),
+        })
+    return {**state, "evidence": normalized, "status": "normalized"}
+
+
+def score_feasibility(state: GraphState) -> GraphState:
+    evidence = [EvidenceRecord(**item) for item in state.get("evidence", [])]
+    optimization = deterministic_feasibility(
+        evidence,
+        load_profile={"estimated_load": state.get("context", {}).get("estimated_load", 10), "workload_hours": 8},
+    )
+    return {**state, "optimization": optimization.model_dump(), "status": "scored"}
+
+
+def finalize_plan(state: GraphState) -> GraphState:
+    if state.get("optimization", {}).get("feasible") is False:
+        status = "rejected"
+        warnings = ["Plan rejected by deterministic feasibility gate."]
+    else:
+        status = "finalized"
+        warnings = []
+
+    final_response = {
+        "objective": "Convert fragmented evidence into a usable execution plan.",
+        "constraints": ["Use the available evidence only", "Preserve provenance", "Return structured output"],
+        "assumptions": ["Fixture-mode providers are used for demonstration and reproducibility."],
+        "evidence_sources": [item["source"] for item in state.get("evidence", [])],
+        "execution_plan": [
+            {
+                "step_number": 1,
+                "action": "Normalize and de-duplicate evidence.",
+                "owner": "PlannerAgent",
+                "dependencies": [],
+                "output": "Unified evidence summary",
+                "risk": "None",
+            },
+            {
+                "step_number": 2,
+                "action": "Score feasibility and risk.",
+                "owner": "Optimizer",
+                "dependencies": ["step_1"],
+                "output": "Ranked decision-ready plan",
+                "risk": "Low-quality evidence may lower confidence",
+            },
+        ],
+        "success_criteria": ["Plan is deterministic", "Evidence is traceable", "Output is structured"],
+        "risks": ["Mock environment only"],
+        "provider_recommendation": "Use the best-scoring provider with a deterministic fallback strategy.",
+        "final_answer_summary": "Evidence was normalized, scored, and converted into a structured execution plan.",
+        "confidence": state.get("optimization", {}).get("feasibility_score", 0.0),
+    }
+
     return {
-        "labels": [item.provider for item in scores],
-        "series": [round(item.total_score, 4) for item in scores],
-        "chart_type": "bar",
-        "title": "Mock provider score ranking",
+        **state,
+        "plan": final_response,
+        "final_response": final_response,
+        "status": status,
+        "warnings": warnings,
     }
 
 
-def run_det_model(request: RunRequest) -> RunResponse:
-    provider_scores = [score_provider(name, request) for name in request.sources]
-    provider_scores.sort(key=lambda item: item.total_score, reverse=True)
-    winner = provider_scores[0]
+def route_after_load(state: GraphState) -> str:
+    if state.get("retry_count", 0) >= 3:
+        return "finalize"
+    return "normalize"
 
-    summary_prompt = PromptTemplate(
-        input_variables=["winner", "prompt", "scores"],
-        template=(
-            "Request: {prompt}\nWinner: {winner}\nRanked providers: {scores}\n"
-            "Summary: Use the winner as the preferred provider for the current operating context, "
-            "with the remaining providers held as fallback or comparison options."
-        ),
-    )
-    summary = summary_prompt.format(
-        winner=winner.provider,
-        prompt=request.prompt,
-        scores=", ".join(f"{item.provider}:{item.total_score}" for item in provider_scores),
-    )
 
-    return RunResponse(
-        request_id=f"mock-{abs(hash(request.prompt + ''.join(request.sources))) % 10000}",
-        provider_scores=provider_scores,
-        winner=winner,
-        summary=summary,
-        visual_payload=build_visual_payload(provider_scores),
-        source_status={
-            provider: {"status": "mock", "provider": provider}
-            for provider in request.sources
+def build_graph():
+    builder = StateGraph(GraphState)
+    builder.add_node("load", load_evidence)
+    builder.add_node("normalize", normalize_evidence)
+    builder.add_node("score", score_feasibility)
+    builder.add_node("finalize", finalize_plan)
+
+    builder.add_edge(START, "load")
+    builder.add_conditional_edges(
+        "load",
+        route_after_load,
+        {
+            "normalize": "normalize",
+            "finalize": "finalize",
         },
     )
+    builder.add_edge("normalize", "score")
+    builder.add_edge("score", "finalize")
+    builder.add_edge("finalize", END)
+    return builder.compile()
+
+
+graph = build_graph()
+
+
+def run_workflow(task: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    initial_state: GraphState = {
+        "task": task,
+        "context": context,
+        "evidence": [],
+        "retry_count": 0,
+        "status": "ready",
+        "warnings": [],
+        "provider_snapshot": {},
+        "plan": {},
+        "optimization": {},
+        "final_response": {},
+    }
+    result = graph.invoke(initial_state)
+    return result["final_response"]

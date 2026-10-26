@@ -1,6 +1,8 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from __future__ import annotations
 
-from app.orchestrator import create_app
+import uvicorn
 
-app = create_app()
+from app.main import app
+
+if __name__ == "__main__":
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=False)
