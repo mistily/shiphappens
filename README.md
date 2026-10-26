@@ -4,9 +4,13 @@ GenAI AI Agent Hackathon https://hackathon.genai.works/
 Technologies planned to be used 
 
 https://cloud.enterprise.zetaris.com/dashboard
+
 https://meterless.ai/engines.html
+
 https://cursor.com/agents
+
 https://brightdata.com/
+
 
 
 
