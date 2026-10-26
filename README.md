@@ -9,47 +9,49 @@ https://cursor.com/agents
 https://brightdata.com/
 
 
+
 1. Component architecture
-Existing TypeScript frontend — Grid Avid
+   
+**Existing TypeScript frontend — Grid Avid**
 
 Overview · workflow runs · evidence · CO₂ estimates · audit trail
 
 HTTP / JSON
 
-Python API — FastAPI
+**Python API — FastAPI**
 Validates input, starts runs, returns results and agent traces.
 
-LangGraph orchestrator
+**LangGraph orchestrator**
 
 Shared state · parallel tasks · conditional routing · bounded revision loop
 
-Planner agent
+**Planner agent**
 
 Defines the task and constraints
 
 
-Evidence agent
+**Evidence agent**
 
 Checks source, freshness, units and conflicts
 
 
-Optimization agent
+**Optimization agent**
 
 Evaluates feasible workload windows and carbon impact
 
 
-Critic / validator
+**Critic / validator**
 
 Independently checks constraints and challenges the plan
 
 
 
-Reporter + human approval gate
+**Reporter + human approval gate**
 
 Recommendation · evidence citations · limitations · decision history
 
 
-Tools and provider adapters
+**Tools and provider adapters**
 
 Zetaris
 
@@ -72,7 +74,7 @@ Carbon calculations, feasibility checks and invariant tests.
 
 
 
-NVIDIA — supporting technology
+**NVIDIA — supporting technology**
 
 Explain a credible role in accelerated forecasting or simulation if used. Keep it an optional extension if you do not integrate NVIDIA technology in the MVP.
 
