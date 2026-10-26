@@ -1,34 +1,49 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from pydantic import BaseModel, Field
 
 
-class TaskInput(BaseModel):
-    prompt: str = Field(..., min_length=1)
-    category: Optional[str] = None
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+class ProviderSignal(BaseModel):
+    provider: str
+    category: str
+    latency_ms: int
+    reliability: float
+    coverage: float
+    cost_efficiency: float
+    sustainability: float
+    data_quality: float
+    freshness_hours: int
 
 
-class TaskOutput(BaseModel):
-    status: str = "accepted"
-    summary: str
-    steps: List[str] = Field(default_factory=list)
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+class ProviderScore(BaseModel):
+    provider: str
+    category: str
+    total_score: float
+    weighted_breakdown: Dict[str, float]
+    recommendation: str
+    rationale: str
 
 
-class PromptEnvelope(BaseModel):
-    message: str
-    source: str = "api"
+class RunRequest(BaseModel):
+    prompt: str = Field(..., min_length=4)
+    region: str = Field(default="emea")
+    priority: str = Field(default="balanced")
+    sources: List[str] = Field(default_factory=lambda: ["zetaris", "meterless", "brightdata"]) 
 
 
-class AgentTrace(BaseModel):
-    agent: str
-    result: str
-
-
-class WorkflowResult(BaseModel):
+class RunResponse(BaseModel):
     request_id: str
-    outputs: List[AgentTrace] = Field(default_factory=list)
-    final_status: str = "ok"
+    provider_scores: List[ProviderScore]
+    winner: ProviderScore
+    summary: str
+    visual_payload: Dict[str, Any]
+    source_status: Dict[str, Any]
+
+
+class ProviderInventoryItem(BaseModel):
+    name: str
+    category: str
+    status: str
+    notes: str

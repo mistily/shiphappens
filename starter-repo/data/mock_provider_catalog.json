@@ -1,0 +1,75 @@
+from __future__ import annotations
+
+from typing import Any, Dict, List
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.graph import run_langgraph
+from app.mock_sources import get_provider_inventory
+from app.schemas import ProviderInventoryItem, RunRequest, RunResponse
+
+
+def create_app() -> FastAPI:
+    app = FastAPI(title="Ship Happens Mock Data Agent Graph", version="1.0.0")
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    @app.get("/health")
+    async def health() -> Dict[str, Any]:
+        return {
+            "status": "ok",
+            "service": "shiphappens",
+            "mock_mode": True,
+            "providers": [item["name"] for item in get_provider_inventory()],
+        }
+
+    @app.get("/providers", response_model=List[ProviderInventoryItem])
+    async def providers() -> List[ProviderInventoryItem]:
+        return [
+            ProviderInventoryItem(
+                name=item["name"],
+                category=item["category"],
+                status=item["status"],
+                notes=item["notes"],
+            )
+            for item in get_provider_inventory()
+        ]
+
+    @app.post("/run")
+    async def run(request: RunRequest) -> Dict[str, Any]:
+        graph_result = run_langgraph(request)
+        response = {
+            "request_id": f"mock-{abs(hash(request.prompt)) % 100000}",
+            "provider_scores": graph_result["ranked_scores"],
+            "winner": graph_result["recommendation"],
+            "summary": graph_result["summary"],
+            "visual_payload": graph_result["visual"],
+            "source_status": {
+                provider: {"status": "mock"}
+                for provider in request.sources
+            },
+        }
+        return response
+
+    @app.post("/api/run")
+    async def run_api(request: RunRequest) -> Dict[str, Any]:
+        return await run(request)
+
+    @app.get("/dashboard")
+    async def dashboard() -> Dict[str, Any]:
+        request = RunRequest(
+            prompt="Summarize provider reliability for a balanced operations dashboard.",
+            region="emea",
+            priority="balanced",
+            sources=["zetaris", "meterless", "brightdata"],
+        )
+        return await run(request)
+
+    return app
