@@ -1,0 +1,67 @@
+from __future__ import annotations
+
+from typing import Any, Dict
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.agents import agents
+from app.generator import generator
+from app.hmem import hmem_store
+from app.markovian import markovian
+from app.world_model import world_model
+from app.logger import get_manifest
+
+app = FastAPI(title="Ship Happens Planner API", version="1.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+    allow_credentials=True,
+)
+
+
+@app.get("/health")
+async def health() -> Dict[str, Any]:
+    return {
+        "status": "ok",
+        "service": "shiphappens-planner",
+        "sample_mode": True,
+        "manifest": get_manifest(),
+    }
+
+
+@app.get("/agents")
+async def list_agents() -> Dict[str, Any]:
+    return {"agents": agents.list_agents()}
+
+
+@app.get("/engine/status")
+async def engine_status() -> Dict[str, Any]:
+    return {"manifest": get_manifest(), "hmem": hmem_store.retrieve("status", topN=2), "world_model": world_model.build_context("status", budget=512)}
+
+
+@app.post("/generator/run")
+async def generator_run(payload: Dict[str, Any]) -> Dict[str, Any]:
+    prompt = str(payload.get("prompt") or "empty prompt")
+    system_prompt = payload.get("systemPrompt") or "You are the sample generator."
+    result = generator(prompt, payload.get("attachments", []), system_prompt, None, None)
+    return {"text": result["text"]}
+
+
+@app.post("/markovian/demo")
+async def markovian_demo(payload: Dict[str, Any]) -> Dict[str, Any]:
+    text = str(payload.get("prompt") or "This is a long-form prompt intended to exercise the Markovian chain.")
+    result = markovian.run(prompt=text, memoryContext=payload.get("memoryContext"), mode="ARCHITECT", maxChunks=3, generator_fn=generator)
+    return result
+
+
+@app.get("/demo")
+async def demo() -> Dict[str, Any]:
+    return {
+        "message": "Planner and optimization pipeline is running in fixture mode.",
+        "mode": "fixture",
+        "features": ["evidence ingestion", "LangGraph flow", "deterministic optimization", "generator seam", "hmem", "markovian", "world_model"],
+    }

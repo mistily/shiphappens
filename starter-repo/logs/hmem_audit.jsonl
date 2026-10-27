@@ -1,0 +1,38 @@
+{
+  "timestamp": "2026-10-27T00:00:00Z",
+  "engines": {
+    "hmem": {
+      "status": "live"
+    },
+    "markovian": {
+      "status": "live"
+    },
+    "world_model": {
+      "status": "live"
+    },
+    "generator": {
+      "status": "live"
+    }
+  },
+  "helpers": {
+    "logger": {
+      "status": "live"
+    },
+    "generator_sample_mode": {
+      "status": "live"
+    },
+    "hmem_retrieval": {
+      "status": "live"
+    },
+    "world_model_context_builder": {
+      "status": "live"
+    }
+  },
+  "dormant": [
+    "dreaming",
+    "sleep",
+    "enrichment",
+    "supervisor_agent"
+  ]
+}
+

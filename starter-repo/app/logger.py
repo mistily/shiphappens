@@ -1,51 +1,64 @@
 from __future__ import annotations
 
 import json
-import logging
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 
-def configure_logger(name: str = "shiphappens", log_dir: Optional[str] = None) -> logging.Logger:
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
-    logger.propagate = False
-
-    if logger.handlers:
-        return logger
-
-    formatter = logging.Formatter(
-        "%(asctime)s | %(levelname)s | %(name)s | %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-
-    stream_handler = logging.StreamHandler()
-    stream_handler.setFormatter(formatter)
-    logger.addHandler(stream_handler)
-
-    log_path = Path(log_dir or os.getenv("LOG_DIR", "logs"))
-    log_path.mkdir(parents=True, exist_ok=True)
-    file_handler = logging.FileHandler(log_path / "app.log", encoding="utf-8")
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
-
-    return logger
+LOG_DIR = Path(__file__).resolve().parents[1] / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 
-logger = configure_logger()
+def emit_jsonl(name: str, payload: Dict[str, Any]) -> None:
+    path = LOG_DIR / name
+    record = {"ts": datetime.now(timezone.utc).isoformat(), **payload}
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, default=str, sort_keys=True) + "\n")
+    _refresh_manifest()
 
 
-def emit_trace(event: str, payload: Optional[Dict[str, Any]] = None) -> None:
-    trace = {
+def _refresh_manifest() -> None:
+    manifest_path = LOG_DIR / "manifest.json"
+    state = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "event": event,
-        "payload": payload or {},
+        "engines": {
+            "hmem": {"status": "live"},
+            "markovian": {"status": "live"},
+            "world_model": {"status": "live"},
+            "generator": {"status": "live"},
+        },
+        "helpers": {
+            "logger": {"status": "live"},
+            "generator_sample_mode": {"status": "live"},
+            "hmem_retrieval": {"status": "live"},
+            "world_model_context_builder": {"status": "live"},
+        },
+        "dormant": ["dreaming", "sleep", "enrichment", "supervisor_agent"],
     }
-    log_dir = Path(os.getenv("LOG_DIR", "logs"))
-    log_dir.mkdir(parents=True, exist_ok=True)
-    trace_path = log_dir / "sample_trace.jsonl"
-    with trace_path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(trace) + "\n")
-    logger.info("Trace event %s: %s", event, json.dumps(payload or {}, default=str))
+    manifest_path.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def get_manifest() -> Dict[str, Any]:
+    path = LOG_DIR / "manifest.json"
+    if not path.exists():
+        _refresh_manifest()
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def ensure_jsonl(name: str) -> None:
+    path = LOG_DIR / name
+    if not path.exists():
+        path.touch()
+
+
+for _name in [
+    "hmem_audit.jsonl",
+    "hmem_retrieval_trace.jsonl",
+    "markovian_runs.jsonl",
+    "world_ingest.jsonl",
+    "agent_step_done.jsonl",
+]:
+    ensure_jsonl(_name)
+
+_refresh_manifest()
